@@ -1,0 +1,74 @@
+"""
+To send AWS ECS unhealty messages to AWS cloudwatch as metric with their counts.
+"""
+
+from __future__ import print_function
+from datetime import datetime, timezone, timedelta
+from datetime import time as time_of_day
+import boto3
+import pprint
+import time
+import os
+import re
+
+def check_timevalid(t1,t2,lambda_freq):
+    '''
+    to check if difference of 2 times (current and logtime) is within
+    lambda frequency
+    '''
+    if (t1-t2).total_seconds() < lambda_freq :
+        return True
+    return False
+
+client = boto3.client('ecs')
+cloudwatch_client = boto3.client('cloudwatch')
+lambda_freq=2.1*86400  #seconds
+now=datetime.now(timezone.utc)
+metric_dict={} # (dim1, dim2, dim3): count
+query_str='.service ([A-Za-z\-]+)\).*unhealthy in .target-group ([A-Za-z0-9\-:/]+).*due to (\(.*\))'
+unhealthy_message=re.compile(query_str)
+
+services_list = client.describe_services(cluster="arn:aws:ecs:us-west-2:2321321312:cluster/abc", services=["arn:aws:ecs:us-west-2:1321313232:service/abc"])
+for ecslog in services_list['services'][0]['events']:
+    #print(ecslog)
+    m=unhealthy_message.match(ecslog['message'])
+    #print (m)    
+    time_valid=check_timevalid(now, ecslog['createdAt'],lambda_freq)
+    #time_valid = True 
+    if m and time_valid:
+        dim1=m.group(1)
+        dim2=m.group(2)
+        dim3=m.group(3)
+        if (dim1, dim2, dim3) in metric_dict:
+            metric_dict[(dim1,dim2,dim3)] += 1
+        else:
+            metric_dict[(dim1,dim2,dim3)]=1
+
+print(metric_dict)
+
+for dim1,dim2, dim3 in metric_dict.keys():
+    resp=cloudwatch_client.put_metric_data(Namespace='_CW_NAMESPACE',
+            MetricData=[
+            {
+                'MetricName': '_CW_METRIC_NAME',
+                'Dimensions': [
+                        {
+                        'Name': 'service',
+                        'Value': dim1
+                        },
+                        {
+                        'Name': 'target_grp',
+                        'Value': dim2
+                        },
+                        {
+                        'Name': 'FailReason',
+                        'Value': dim3
+                        }
+
+                    ],
+                'Timestamp':now,
+                'Value':metric_dict[(dim1,dim2,dim3)],
+                'Unit':'Count'
+            }
+            ])
+            
