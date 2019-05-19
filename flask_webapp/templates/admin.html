@@ -1,0 +1,24 @@
+ <html>
+   <body>
+      <form action = "{{url_for('admin')}}" method = "post">
+          <button type="submit" name="submit_button" value="List User">List User</button>
+          <p><input type = "text" name = "name" /></p>
+          <button type="submit" name="submit_button" value="Create User">Create User</button>
+          <button type="submit" name="submit_button" value="Delete User">Delete User</button>
+<!----
+      <form action = "http://localhost:5000/admin" method = "post">
+          <button type="submit" onclick="myFunction()" name="submit_button" id="del" >Delete User</button>
+            <script>
+            function myFunction() {
+              var r = confirm("Proceed with deletion request?");
+              if (r == true) {
+                 document.getElementById("del").value = "Delete User";
+              } else {
+                 return false
+              }
+            }
+            </script>
+------>
+      </form>
+   </body>
+</html>
